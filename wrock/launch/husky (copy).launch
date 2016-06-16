@@ -1,0 +1,14 @@
+<launch>
+
+ 
+  <!--- Run openni -->
+  <include file="$(find openni_launch)/launch/openni.launch" />
+
+  <!--- Run openni_tracker -->
+  <node name="openni_tracker" pkg="openni_tracker" type="openni_tracker" > 
+</node>
+
+  <!--- Run rviz -->
+    <node name="rviz" pkg="rviz" type="rviz" > 
+</node>
+</launch>
