@@ -125,11 +125,15 @@ endif()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-    CATKIN_DEPENDS sensor_msgs tf urdf diagnostic_updater schunk_libm5api libntcan libpcan cob_srvs brics_actuator diagnostic_msgs control_msgs  message_runtime
     DEPENDS # TODO
-    INCLUDE_DIRS common/include
-    #LIBRARIES # TODO
-)
+    INCLUDE_DIRS 
+      common/include
+      include
+    LIBRARIES # TODO
+      bcap_client
+      bcap_server
+CATKIN_DEPENDS sensor_msgs tf urdf diagnostic_updater schunk_libm5api libntcan libpcan cob_srvs brics_actuator diagnostic_msgs control_msgs  message_runtime roscpp
+)    
 
 ###########
 ## Build ##
@@ -138,7 +142,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(common/include /home/mike/pcl-master/filters/include/pcl/filters ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+include_directories(common/include include /home/mike/pcl-master/filters/include/pcl/filters ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 
 
 ## Declare a C++ library
@@ -211,6 +215,11 @@ include_directories(common/include /home/mike/pcl-master/filters/include/pcl/fil
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
+
+# Definitions
+add_definitions(-D_USE_LINUX_API)
+#add_definitions(-D_USE_CUSTOM_INTPTR)
+
 add_executable(cube_state_publisher src/cube_state_publisher.cpp)
 add_executable(inverse_d_server src/inverse_d_server.cpp)
 add_executable(cube_move src/cube_move.cpp)
@@ -228,7 +237,23 @@ add_executable(global_trans src/global_trans.cpp)
 add_executable(cloud_parser src/cloud_parser.cpp)
 add_executable(registration src/registration.cpp)
 add_executable(master src/master.cpp)
+add_executable(denso src/denso.cpp)
 
+# Client library
+add_library(bcap_client 
+  src/bcap_common.c
+  src/dn_com.c
+  src/dn_common.c
+  src/dn_device.c
+  src/dn_socket.c
+  src/dn_tcp.c
+  src/dn_thread.c
+  src/dn_udp.c
+  src/bcap_client.c
+)
+
+
+target_link_libraries(denso bcap_client ${catkin_LIBRARIES})
 target_link_libraries(cube_state_publisher ${catkin_LIBRARIES})
 target_link_libraries(inverse_d_server ${catkin_LIBRARIES})
 target_link_libraries(cube_move  ${catkin_LIBRARIES})
