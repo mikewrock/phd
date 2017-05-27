@@ -1,0 +1,277 @@
+// Always goes first
+#define _CUSTOM_UINT64
+// ROS
+#include <ros/ros.h>
+
+#include "../include/control_panel.hpp"
+//#include <atlbase.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <string>
+#include <tf/transform_broadcaster.h>
+#include <sensor_msgs/JointState.h>  
+
+#include <phd/cube_msg.h>
+#include <cstdio>
+// Services
+#include "laser_assembler/AssembleScans2.h"
+#include "phd/localize_cloud.h"
+// Messages
+#include "sensor_msgs/PointCloud.h"
+
+#include <pcl/io/pcd_io.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_cloud.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/point_types.h>
+
+#include "rviz/selection/selection_manager.h"
+#include "rviz/viewport_mouse_event.h"
+#include "rviz/display_context.h"
+#include "rviz/selection/forwards.h"
+#include "rviz/properties/property_tree_model.h"
+#include "rviz/properties/property.h"
+#include "rviz/properties/vector_property.h"
+#include "rviz/properties/int_property.h"
+#include "rviz/properties/float_property.h"
+#include "rviz/view_manager.h"
+#include "rviz/view_controller.h"
+#include "OGRE/OgreCamera.h"
+
+#include <ros/ros.h>
+#include <ros/time.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <QVariant>
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/common/transforms.h>
+
+#include <pcl/visualization/pcl_visualizer.h>
+
+#include <pcl/filters/passthrough.h>
+#include <pcl/common/common.h>
+
+#include <pcl/filters/impl/box_clipper3D.hpp>
+
+
+#include <visualization_msgs/Marker.h>
+
+#include <pcl/filters/crop_box.h>
+#include <pcl/common/angles.h>
+
+
+
+
+namespace control_panel{
+namespace control_panel_ns{
+
+        double joint1;
+laser_assembler::AssembleScans2 srv;
+phd::localize_cloud loc_srv;
+
+QNode::~QNode() {
+    if(ros::isStarted()) {
+      ros::shutdown(); // explicitly needed since we use ros::start();
+      ros::waitForShutdown();
+    }
+	wait();
+}
+void QNode::jointCallback(const sensor_msgs::JointState::ConstPtr& msg)
+{
+std::string str1 = "cube_5_joint";
+  std::string str2 =msg->name[0] ;
+if(str1==str2){
+  joint1 = msg->position[0];
+}
+}
+bool QNode::init() {
+	ROS_INFO( "Control Panel initializing");
+	int fargc = 0;
+	char** fargv = (char**)malloc(sizeof(char*)*(fargc+1));
+	ros::init(fargc,fargv,"ControlPanelNode");
+	free(fargv);
+	ros::start();
+	cmd_pub = nh_.advertise<phd::cube_msg>("joint_cmd", 100);
+	pub = nh_.advertise<sensor_msgs::PointCloud2> ("assembled_cloud", 1);
+	joint_sub = nh_.subscribe("cube_joint_states", 1, &control_panel::control_panel_ns::QNode::jointCallback,this);
+    //service client for calling the assembler
+	client = nh_.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
+	loc_client = nh_.serviceClient<phd::localize_cloud>("localize_pcd");
+	start();
+}
+void QNode::run() {
+	std::cout << "Control Panel Running" << std::endl;
+	
+	while ( ros::ok() ) {
+		ros::spinOnce();
+	}
+	std::cout << "Ros shutdown, proceeding to close the gui." << std::endl;
+
+
+	Q_EMIT rosShutdown(); // used to signal the gui for a shutdown (useful to roslaunch)
+}
+
+
+void QNode::scan(){
+
+phd::cube_msg cube_cmd;
+		joint1 = 1;
+	ROS_INFO("Waiting for j1");
+	while((joint1 < -.8 || joint1 > .77) && ros::ok()){
+	ros::spinOnce();
+	//printf("j1: %f\n",joint1);
+	} 
+	cube_cmd.j1 = -2;
+	cube_cmd.j2 = 0;
+	cube_cmd.j3 = 0;
+	cube_cmd.j4 = 0;
+	cube_cmd.j5 = 0;
+	cube_cmd.vel = 0.5;
+	cube_cmd.acc = 2;
+	cube_cmd.pose = true;
+		//send the joint state and transform
+	    // Populate our service request based on our timer callback times
+	cmd_pub.publish(cube_cmd);
+	ros::spinOnce();
+	printf("j1: %f\n",joint1);
+	ROS_INFO("going to start");
+	while(joint1 > -1.9 && ros::ok()){
+	ros::spinOnce();
+	printf("j1is: %f\n",joint1);
+	} 
+	 srv.request.begin = ros::Time::now();
+	cube_cmd.j1 = 0;
+
+	cube_cmd.vel = 0.25;
+	cmd_pub.publish(cube_cmd);
+	ros::spinOnce();
+	ROS_INFO("waiting for end");
+	while(joint1 < -.01 && ros::ok()){
+	ros::spinOnce();
+	} 
+	ROS_INFO("done");
+	 srv.request.end   = ros::Time::now();
+	ros::spinOnce();
+	    // Make the service call
+	    if (client.call(srv))
+	    {
+	      ROS_INFO("Published Cloud %d", (uint32_t)(srv.response.cloud.width)) ;
+	      pub.publish(srv.response.cloud);
+	    }
+	    else
+	    {
+	      ROS_ERROR("Error making service call\n") ;
+	    }
+
+}
+
+
+void QNode::nav_mode(float pos){
+
+phd::cube_msg cube_cmd;
+		
+	cube_cmd.j1 = pos;
+	cube_cmd.j2 = 0;
+	cube_cmd.j3 = 0;
+	cube_cmd.j4 = 0;
+	cube_cmd.j5 = 0;
+	cube_cmd.vel = 0.5;
+	cube_cmd.acc = 2;
+	cube_cmd.pose = true;
+		//send the joint state and transform
+	    // Populate our service request based on our timer callback times
+	cmd_pub.publish(cube_cmd);
+	ros::spinOnce();
+
+}
+
+
+void QNode::fscan(int file){
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI> );
+
+if(file == 2){
+if (pcl::io::loadPCDFile<pcl::PointXYZI> ("/home/mike/marker/plane2.pcd", *cloud) == -1) 
+{
+	PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
+
+}else 
+std::cerr << "Sending cloud with: " << cloud->width * cloud->height << " data points." << std::endl;
+}
+
+if(file == 3){
+if (pcl::io::loadPCDFile<pcl::PointXYZI> ("/home/mike/marker/plane3.pcd", *cloud) == -1) 
+{
+	PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
+
+}else 
+std::cerr << "Sending cloud with: " << cloud->width * cloud->height << " data points." << std::endl;
+}
+if(file == 4){
+if (pcl::io::loadPCDFile<pcl::PointXYZI> ("/home/mike/marker/plane4.pcd", *cloud) == -1) 
+{
+	PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
+
+}else 
+std::cerr << "Sending cloud with: " << cloud->width * cloud->height << " data points." << std::endl;
+}
+
+sensor_msgs::PointCloud2 cloud_msg;
+	pcl::toROSMsg(*cloud,cloud_msg);
+	//fix the naming discrepancy between ROS and PCL (from "intensities" to "intensity")
+	cloud_msg.fields[3].name = "intensities";
+
+loc_srv.request.cloud_in = cloud_msg;
+loc_srv.request.homing = false;
+loc_client.call(loc_srv);
+ROS_INFO("Received Cloud %d", (uint32_t)(loc_srv.response.cloud_out.width)) ;
+	      pub.publish(loc_srv.response.cloud_out);
+
+}
+void QNode::lscan(){
+
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI> );
+
+
+	if (pcl::io::loadPCDFile<pcl::PointXYZI> ("/home/mike/marker/plane1.pcd", *cloud) == -1) 
+	{
+		PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
+
+	}else 
+	std::cerr << "Sending cloud with: " << cloud->width * cloud->height << " data points." << std::endl;
+
+	sensor_msgs::PointCloud2 cloud_msg;
+		pcl::toROSMsg(*cloud,cloud_msg);
+		//fix the naming discrepancy between ROS and PCL (from "intensities" to "intensity")
+		cloud_msg.fields[3].name = "intensities";
+
+	loc_srv.request.cloud_in = cloud_msg;
+	loc_srv.request.homing = true;
+	loc_client.call(loc_srv);
+	ROS_INFO("Received Cloud %d", (uint32_t)(loc_srv.response.cloud_out.width)) ;
+		      pub.publish(loc_srv.response.cloud_out);
+}
+void QNode::cluster(int index){
+	rviz::ViewportMouseEvent& event;
+	int flags = rviz::SelectionTool::processMouseEvent( event );
+	ROS_INFO("Clustering %d", index) ;
+ 	rviz::SelectionManager* sel_manager = context_->getSelectionManager();
+    	rviz::M_Picked selection = sel_manager->getSelection();
+    	rviz::PropertyTreeModel *model = sel_manager->getPropertyModel();
+   	int num_points = model->rowCount();
+	ROS_INFO("Selected %d points", num_points);
+}
+
+void QNode::save_marker(){
+
+
+	ROS_INFO("Saved Marker") ;
+}
+
+
+
+
+}
+};
+
+
