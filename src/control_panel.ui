@@ -139,7 +139,7 @@
     <widget class="QPushButton" name="cluster1">
      <property name="geometry">
       <rect>
-       <x>0</x>
+       <x>20</x>
        <y>170</y>
        <width>91</width>
        <height>27</height>
@@ -149,50 +149,24 @@
       <string>Cluster Pt.1</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="cluster2">
+    <widget class="QPushButton" name="gen_trajectory">
      <property name="geometry">
       <rect>
-       <x>97</x>
-       <y>170</y>
-       <width>91</width>
-       <height>27</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Cluster Pt.2</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="cluster3">
-     <property name="geometry">
-      <rect>
-       <x>190</x>
-       <y>170</y>
-       <width>91</width>
-       <height>27</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Cluster Pt.3</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="save_marker">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
+       <x>20</x>
        <y>200</y>
-       <width>98</width>
+       <width>151</width>
        <height>27</height>
       </rect>
      </property>
      <property name="text">
-      <string>Save Marker</string>
+      <string>Generate Trajectory</string>
      </property>
     </widget>
     <widget class="QLabel" name="marker_info">
      <property name="geometry">
       <rect>
-       <x>110</x>
-       <y>206</y>
+       <x>120</x>
+       <y>175</y>
        <width>151</width>
        <height>17</height>
       </rect>

@@ -42,9 +42,7 @@ namespace control_panel
 		connect(ui_.localization_button, SIGNAL(clicked()), this, SLOT(localization_scan()));
 		connect(ui_.localization_button_2, SIGNAL(clicked()), this, SLOT(localization_scan_2()));
 		connect(ui_.cluster1, SIGNAL(clicked()), this, SLOT(cluster_1()));
-		connect(ui_.cluster2, SIGNAL(clicked()), this, SLOT(cluster_2()));
-		connect(ui_.cluster3, SIGNAL(clicked()), this, SLOT(cluster_3()));
-		connect(ui_.save_marker, SIGNAL(clicked()), this, SLOT(save_marker()));
+		connect(ui_.gen_trajectory, SIGNAL(clicked()), this, SLOT(gen_trajectory()));
 		connect(ui_.fwdButton, SIGNAL(pressed()), this, SLOT(fwd_vel()));
 		connect(ui_.revButton, SIGNAL(pressed()), this, SLOT(rev_vel()));
 		connect(ui_.turnLeft, SIGNAL(pressed()), this, SLOT(left_vel()));
@@ -78,6 +76,8 @@ namespace control_panel
 		connect(ui_.yaw_neg, SIGNAL(released()), this, SLOT(clear_vel()));
 		connect(ui_.yaw_pos, SIGNAL(released()), this, SLOT(clear_vel()));
 		//connect( output_timer, SIGNAL( timeout() ), this, SLOT( sendVel() ));
+
+		cluster_index = 0;
 	}
 
 	ControlPanel::~ControlPanel(){}
@@ -104,24 +104,25 @@ namespace control_panel
 	}
 	void ControlPanel::cluster_1(){
 
-		  control_panel.cluster(0);
-		  ui_.marker_info->setText("Point 1 Recorded");
+		  control_panel.cluster(cluster_index);
+		if(cluster_index == 0){
+		 ui_.cluster1->setText("Cluster Pt. 2");
+		 cluster_index+=1;
+		}
+		else if(cluster_index == 1){
+		 ui_.cluster1->setText("Cluster Pt. 3");
+		 ++cluster_index;
+		}
+		else if(cluster_index == 2){
+		 ui_.cluster1->setText("Cluster Pt. 1");
+		 ui_.marker_info->setText("Marker Recorded");
+		 cluster_index = 0;
+		}
 	}
-	void ControlPanel::cluster_2(){
+	void ControlPanel::gen_trajectory(){
 
-		  control_panel.cluster(1);
-		  ui_.marker_info->setText("Point 2 Recorded");
-	}
-	void ControlPanel::cluster_3(){
+		  control_panel.gen_trajectory();
 
-		  control_panel.cluster(2);
-		  ui_.marker_info->setText("Point 3 Recorded");
-	}
-	void ControlPanel::save_marker(){
-
-		  control_panel.save_marker();
-
-		  ui_.marker_info->setText("Marker Saved");
 	}
 	void ControlPanel::localization_scan(){
 
