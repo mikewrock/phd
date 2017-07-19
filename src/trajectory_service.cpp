@@ -126,7 +126,7 @@ pcl::PointXYZI unit_cross(pcl::PointXYZI vectorA,pcl::PointXYZI vectorB){
 }
 //calculates a unit vector
 pcl::PointXYZI unit_vector(pcl::PointXYZI vectorA,pcl::PointXYZI vectorB){
-ROS_INFO("Crossing %f - %f - %f / %f - %f - %f", vectorA.x,vectorA.y,vectorA.z,vectorB.x,vectorB.y,vectorB.z);
+//ROS_INFO("Crossing %f - %f - %f / %f - %f - %f", vectorA.x,vectorA.y,vectorA.z,vectorB.x,vectorB.y,vectorB.z);
 	pcl::PointXYZI result;
 	float d_total = vec_length(vectorA,vectorB);
 	result.x = (vectorB.x-vectorA.x)/d_total;
@@ -534,23 +534,23 @@ phd::trajectory_array calc_line_points(float z_val, float P1x, float P1y, float 
 
 }
 
-phd::trajectory_msg sort_line(pcl::PointCloud<pcl::PointXYZI>::Ptr line, pcl::PointXYZI start_point){
+phd::trajectory_msg sort_line(pcl::PointCloud<pcl::PointXYZI>::Ptr line, pcl::PointXYZI start_point, int sort_dir){
 
 	phd::trajectory_msg sorted;
 	phd::trajectory_point point_holder;
 	pcl::PointXYZI start_pt = find_pt(line,start_point);
 	pcl::PointXYZI dir, search_pt, d_pt, ctr_pt, ctr_pt2;
-	ROS_INFO("Starting %f - %f - %f",start_point.x,start_point.y,start_point.z);
+	//ROS_INFO("Starting %f - %f - %f",start_point.x,start_point.y,start_point.z);
 	float d, d_total;
 	float dir_val, old_d;
 	for(pcl::PointCloud<pcl::PointXYZI>::iterator ctr = line->begin(); ctr < line->end(); ++ctr) ROS_INFO("P: %f - %f - %f", ctr->x,ctr->y,ctr->z);
 	for(pcl::PointCloud<pcl::PointXYZI>::iterator ctr = line->begin(); ctr < line->end(); ++ctr){
-		ROS_INFO("CP: %f - %f - %f", ctr->x,ctr->y,ctr->z);
+		//ROS_INFO("CP: %f - %f - %f", ctr->x,ctr->y,ctr->z);
 		d_total = 0;	
 		dir_val = 0.01;
 		//ctr_pt = start_pt;
 		ctr_pt2 = *ctr;
-ROS_INFO("Start %f - %f - %f", start_pt.x,start_pt.y,start_pt.z);
+//ROS_INFO("Start %f - %f - %f", start_pt.x,start_pt.y,start_pt.z);
 		old_d = 100;
 		while(sqrt(pow(ctr_pt2.x-start_pt.x,2)+pow(ctr_pt2.y-start_pt.y,2)) > 0.01 ){
 			dir = unit_vector(ctr_pt2,start_pt);
@@ -570,11 +570,11 @@ ROS_INFO("Start %f - %f - %f", start_pt.x,start_pt.y,start_pt.z);
 				dir_val = 0.01;
 			}else{
 				dir_val+=0.01;
-				ROS_INFO("Expanding search");
+				//ROS_INFO("Expanding search");
 			}
-			old_d = sqrt(pow(ctr->x-ctr_pt.x,2)+pow(ctr->y-ctr_pt.y,2));
 		}
 		point_holder.d = d_total;
+		point_holder.d_abs = sqrt(pow(ctr->x-start_pt.x,2)+pow(ctr->y-start_pt.y,2));
 		point_holder.x = ctr->x;
 		point_holder.y = ctr->y;
 		point_holder.z = ctr->z;
@@ -591,10 +591,22 @@ ROS_INFO("Start %f - %f - %f", start_pt.x,start_pt.y,start_pt.z);
 	
 	}
 	//for(int i = 0; i < sorted.points.size(); ++i) ROS_INFO("P %f",sorted.points[i].d);
+	if(sort_dir ==1) std::sort (sorted.points.begin(), sorted.points.end(), forward_sort);
+	else std::sort (sorted.points.begin(), sorted.points.end(), reverse_sort);
+	sorted.start_pt = pt_copy(start_pt);
 	return sorted;
 
 }
-
+phd::trajectory_msg recalc_d(phd::trajectory_msg sect, pcl::PointXYZI start_pt){
+	phd::trajectory_msg ret;
+	phd::trajectory_point pt_holder;
+	for(int ctr = 0; ctr < sect.points.size(); ++ctr){
+		pt_holder = sect.points[ctr];
+		pt_holder.d_abs =  sqrt(pow(pt_holder.x-start_pt.x,2)+pow(pt_holder.y-start_pt.y,2));
+		ret.points.push_back(pt_holder);
+	}
+	return ret;
+}
 phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax){
 
 	pcl::PointCloud<pcl::PointXYZI>::Ptr line (new pcl::PointCloud<pcl::PointXYZI>);
@@ -611,7 +623,7 @@ phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax)
 	int cctr = 1;
 	int dir = 1;
 	phd::trajectory_array t_array,sorted_array;
-	phd::trajectory_msg sorted_line, remainder;
+	phd::trajectory_msg sorted_line, remainder, remainder_full, remainder_d;
 	float max_d;
 
 	while(z_val < zmax){
@@ -622,20 +634,18 @@ phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax)
 		pass.setFilterLimits (z_val - Z_HEIGHT,z_val + Z_HEIGHT);
 		pass.filter (*line);
 		search_pt.z = z_val;
-		sorted_line = sort_line(line, search_pt);
+		sorted_line = sort_line(line, search_pt,dir);
 		sorted_array.sections.push_back(sorted_line);
 		z_val+=HEIGHT_STEP;
+		dir = dir * -1;
 	}
 	ROS_INFO("Done while");
 	for(int actr = 0; actr<sorted_array.sections.size(); ++actr){
-		via_pt = pt_copy(sorted_array.sections[actr].points[0]);
-		start_pt = via_pt;
+		start_pt = pt_copy(sorted_array.sections[actr].points[0]);
+		if(actr%2==0) chunk.points.push_back(sorted_array.sections[actr].points[0]);
+		via_pt = start_pt;
 		max_d = 0;
-		chunk.points.push_back(sorted_array.sections[actr].points[0]);
 		for(int ctr = 0; ctr < sorted_array.sections[actr].points.size(); ++ctr){
-			sorted_array.sections[actr].points[ctr].d_abs = 
-				sqrt(pow(sorted_array.sections[actr].points[ctr].x-start_pt.x,2) 
-				+pow(sorted_array.sections[actr].points[ctr].y-start_pt.y,2));
 			if(sorted_array.sections[actr].points[ctr].d_abs < WORKSPACE){
 				if(sqrt(pow(sorted_array.sections[actr].points[ctr].x-via_pt.x,2)
 					+pow(sorted_array.sections[actr].points[ctr].y-via_pt.y,2))>VIA_DISTANCE){
@@ -652,9 +662,13 @@ phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax)
 				remainder.points.push_back(sorted_array.sections[actr].points[ctr]);
 			}
 		}
-		t_array.sections.push_back(chunk);
+		if(actr%2==1) chunk.points.push_back(sorted_array.sections[actr].points[sorted_array.sections[actr].points.size()-1]);
+		remainder_d = recalc_d(remainder, end_pt);
+		remainder.points.clear();
+		remainder_full.points.insert(remainder_full.points.end(), remainder_d.points.begin(), remainder_d.points.end());
+		remainder_d.points.clear();
 	}
-			
+	t_array.sections.push_back(chunk);	
 	sensor_msgs::PointCloud2 line_cloud;
 	pcl::toROSMsg(*line,line_cloud);
 	line_pub.publish(line_cloud);
