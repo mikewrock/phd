@@ -163,11 +163,11 @@ pcl::PointXYZI find_pt(pcl::PointXYZI target_pt){
 
 	octree.setInputCloud (cloud_surface);
 	octree.addPointsFromInputCloud ();
-ROS_INFO("looking near %f/%f/%f",target_pt.x,target_pt.y,target_pt.z);
+//ROS_INFO("looking near %f/%f/%f",target_pt.x,target_pt.y,target_pt.z);
 	if (octree.nearestKSearch (target_pt, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0){
 		
 		foundpt = cloud_surface->points[pointIdxNKNSearch[0]];
-		ROS_INFO("Found pt %f/%f/%f near %f/%f/%f",foundpt.x,foundpt.y,foundpt.z,target_pt.x,target_pt.y,target_pt.z);
+		//ROS_INFO("Found pt %f/%f/%f near %f/%f/%f",foundpt.x,foundpt.y,foundpt.z,target_pt.x,target_pt.y,target_pt.z);
 	}else ROS_INFO("Could not find point");
 
 	return foundpt;
@@ -187,11 +187,11 @@ pcl::PointXYZI find_pt(pcl::PointCloud<pcl::PointXYZI>::Ptr l_cloud, pcl::PointX
 
 	octree.setInputCloud (l_cloud);
 	octree.addPointsFromInputCloud ();
-ROS_INFO("/ooking near %f/%f/%f",target_pt.x,target_pt.y,target_pt.z);
+//ROS_INFO("/ooking near %f/%f/%f",target_pt.x,target_pt.y,target_pt.z);
 	if (octree.nearestKSearch (target_pt, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0){
 		
 		foundpt = l_cloud->points[pointIdxNKNSearch[0]];
-		ROS_INFO("Found pt %f/%f/%f near %f/%f/%f",foundpt.x,foundpt.y,foundpt.z,target_pt.x,target_pt.y,target_pt.z);
+		//ROS_INFO("Found pt %f/%f/%f near %f/%f/%f",foundpt.x,foundpt.y,foundpt.z,target_pt.x,target_pt.y,target_pt.z);
 	}else ROS_INFO("Could not find point");
 
 	return foundpt;
@@ -327,8 +327,8 @@ void show_markers(phd::trajectory_array t_array){
 		path.id = ctr;
 		surface_path.id = ctr;
 		marker.id = ctr;
-		path.color.b = 0.25*ctr;
-		marker.color.r = 0.25*ctr;
+		path.color.b = 0.2*ctr;
+		marker.color.r = 0.2*ctr;
 		t_msg.points.swap(t_array.sections[ctr].points);
 		int num_pts = t_msg.points.size();
 		path.points.resize(num_pts);
@@ -543,7 +543,7 @@ phd::trajectory_msg sort_line(pcl::PointCloud<pcl::PointXYZI>::Ptr line, pcl::Po
 	//ROS_INFO("Starting %f - %f - %f",start_point.x,start_point.y,start_point.z);
 	float d, d_total;
 	float dir_val, old_d;
-	for(pcl::PointCloud<pcl::PointXYZI>::iterator ctr = line->begin(); ctr < line->end(); ++ctr) ROS_INFO("P: %f - %f - %f", ctr->x,ctr->y,ctr->z);
+	//for(pcl::PointCloud<pcl::PointXYZI>::iterator ctr = line->begin(); ctr < line->end(); ++ctr) ROS_INFO("P: %f - %f - %f", ctr->x,ctr->y,ctr->z);
 	for(pcl::PointCloud<pcl::PointXYZI>::iterator ctr = line->begin(); ctr < line->end(); ++ctr){
 		//ROS_INFO("CP: %f - %f - %f", ctr->x,ctr->y,ctr->z);
 		d_total = 0;	
@@ -622,8 +622,8 @@ phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax)
 	phd::trajectory_msg chunk;
 	int cctr = 1;
 	int dir = 1;
-	phd::trajectory_array t_array,sorted_array;
-	phd::trajectory_msg sorted_line, remainder, remainder_full, remainder_d;
+	phd::trajectory_array t_array,sorted_array, remainder_array;
+	phd::trajectory_msg sorted_line, remainder, remainder_full, remainder_d, remainder_two;
 	float max_d;
 
 	while(z_val < zmax){
@@ -640,6 +640,7 @@ phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax)
 		dir = dir * -1;
 	}
 	ROS_INFO("Done while");
+	//remainder_array.sections.resize(sorted_array.sections.size());
 	for(int actr = 0; actr<sorted_array.sections.size(); ++actr){
 		start_pt = pt_copy(sorted_array.sections[actr].points[0]);
 		if(actr%2==0) chunk.points.push_back(sorted_array.sections[actr].points[0]);
@@ -665,10 +666,52 @@ phd::trajectory_array calc_points(float z_val, float P1x, float P1y, float zmax)
 		if(actr%2==1) chunk.points.push_back(sorted_array.sections[actr].points[sorted_array.sections[actr].points.size()-1]);
 		remainder_d = recalc_d(remainder, end_pt);
 		remainder.points.clear();
-		remainder_full.points.insert(remainder_full.points.end(), remainder_d.points.begin(), remainder_d.points.end());
+		remainder_array.sections.push_back(remainder_d);
 		remainder_d.points.clear();
 	}
-	t_array.sections.push_back(chunk);	
+	t_array.sections.push_back(chunk);
+	chunk.points.clear();
+	bool complete = false;
+ROS_INFO("Done while");
+	int r_pts = remainder_array.sections[0].points.size()+1;
+	while(remainder_array.sections[0].points.size()>0 && remainder_array.sections[0].points.size() != r_pts){
+		r_pts = remainder_array.sections[0].points.size();
+		for(int actr = 0; actr<remainder_array.sections.size(); ++actr){
+			start_pt = pt_copy(remainder_array.sections[actr].points[0]);
+			if(actr%2==0 && remainder_array.sections[actr].points[0].d != 0) chunk.points.push_back(remainder_array.sections[actr].points[0]);
+			via_pt = start_pt;
+			max_d = 0;
+			for(int ctr = 0; ctr < remainder_array.sections[actr].points.size(); ++ctr){
+				if(remainder_array.sections[actr].points[ctr].d_abs < WORKSPACE){
+					if(sqrt(pow(remainder_array.sections[actr].points[ctr].x-via_pt.x,2)
+						+pow(remainder_array.sections[actr].points[ctr].y-via_pt.y,2))>VIA_DISTANCE){
+						// || dot_product(line_points[via_ctr],line_points[ctr])<NORM_ANGLE)
+						chunk.points.push_back(remainder_array.sections[actr].points[ctr]);
+						via_pt = pt_copy(remainder_array.sections[actr].points[ctr]);
+						if(remainder_array.sections[actr].points[ctr].d>max_d){
+							end_pt = pt_copy(remainder_array.sections[actr].points[ctr]);
+							max_d = remainder_array.sections[actr].points[ctr].d;
+						}
+					}
+				}
+				else{ 
+
+					remainder.points.push_back(remainder_array.sections[actr].points[ctr]);
+
+				}
+			}
+			if(actr%2==1 && remainder_array.sections[actr].points[remainder_array.sections[actr].points.size()-1].d != 0) chunk.points.push_back(remainder_array.sections[actr].points[remainder_array.sections[actr].points.size()-1]);
+
+			remainder_d = recalc_d(remainder, end_pt);
+			remainder.points.clear();
+			remainder_array.sections[actr].points.clear();
+			remainder_array.sections[actr].points.swap(remainder_d.points);
+			remainder_d.points.clear();
+		}
+		t_array.sections.push_back(chunk);
+		chunk.points.clear();
+	}
+		
 	sensor_msgs::PointCloud2 line_cloud;
 	pcl::toROSMsg(*line,line_cloud);
 	line_pub.publish(line_cloud);
